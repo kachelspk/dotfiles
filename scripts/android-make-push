@@ -1,0 +1,78 @@
+#!/bin/bash
+#
+# build & install package : ./install.sh  packagename
+#
+GREEN="\e[92m"
+RED="\e[91m"
+STOP="\e[0m"
+if [ ! -d  log ]; then
+    echo "Create log folder"
+    mkdir log
+fi
+
+source build/envsetup.sh
+lunch $TARGET_PRODUCT-$TARGET_BUILD_VARIANT
+if [[ $# -ne 1 ]]; then
+    echo " `basename "$0"` PackageName"
+    log_file=log/make-all-$(date  +%Y-%m-%d-%H:%M).log
+    make 2>&1 | tee $log_file
+else
+    log_file=log/$1-$(date  +%Y-%m-%d-%H:%M).log
+    echo "make $1"
+    make $1 2>&1 | tee $log_file
+fi
+
+
+
+if [ ${PIPESTATUS[0]} -eq 0 ]; then
+    printf "${GREEN}"
+    figlet -f standard "Successful"
+    printf "${STOP}"
+    echo LogFile: $log_file
+else
+    printf "${RED}"
+    figlet -f standard "Failed"
+    printf "${STOP}"
+    echo LogFile: $log_file
+    exit 172
+fi
+
+# Push to device
+
+timeout 5 adb wait-for-device root
+if [ $? -ne 0 ]; then
+    printf "${RED}"
+    echo "Cant found device"
+    exit 172
+fi
+adb wait-for-device
+## check disable-verity
+remount=$(adb remount)
+if [[ "$remount" =~ "remount failed" ]]; then
+    echo "Failed to remount, Need to disable-verity"
+    adb disable-verity
+    adb reboot
+    sleep 20
+    adb wait-for-device root
+    adb wait-for-device
+    adb remount
+else
+    echo "Remount success"
+fi
+
+#read log file & collect push files
+while IFS= read line
+do
+    if [[ "$line" =~ "Install:" || "$line" =~ "Copy:"    ]]; then
+        #echo $line
+        path_file=$( echo $line |  awk -F" "  '! /obj/ {print $NF}')
+        if [[ ! -z "$path_file" ]]; then
+            #echo "adb push $path_file  /${path_file#*/*/*/*/}"
+            adb push $path_file  /${path_file#*/*/*/*/}
+        fi
+    fi
+done <"$log_file"
+adb shell input keyevent 26
+sleep 2
+adb reboot
+

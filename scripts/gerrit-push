@@ -1,0 +1,7 @@
+#!/bin/bash
+url=$(git branch -a | fzf)
+IFS=/ read -a elements <<< ${url}
+branch=${elements[2]}
+remote=${elements[1]}
+echo "git push $remote HEAD:refs/for/$branch"
+git push $remote HEAD:refs/for/$branch

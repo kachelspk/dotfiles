@@ -1,0 +1,9 @@
+" Configs
+source ~/.vim/plugins.vim
+" This script contains mappings
+source ~/.vim/configs.vim
+" This script contains plugin specific settings
+source ~/.vim/mapping.vim
+" additional helper functions:
+source ~/.vim/functions.vim
+

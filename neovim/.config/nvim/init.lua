@@ -1,0 +1,7 @@
+local scheme = require('lib.scheme')
+require('keymap')
+require('options')
+require('plug')
+require('colorscheme')
+require('config.plug')
+require('config.modules')

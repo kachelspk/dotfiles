@@ -1,0 +1,52 @@
+#!/bin/bash
+# Check to see if a pipe exists on stdin.
+
+GREEN="\e[92m"
+RED="\e[91m"
+STOP="\e[0m"
+
+if [[ $# -eq 1 ]]; then
+    log_file="$1"
+	if [ ! -f "$log_file" ]; then
+		echo "$log_file does not exists."
+		exit -1
+	fi
+else
+	echo "Please point to build log: $0 path_to_build.log "
+	exit -1
+fi
+exit
+
+timeout 5 adb wait-for-device root
+if [ $? -ne 0 ]; then
+    printf "${RED}"
+    echo "Cant found device"
+    exit 172
+fi
+adb wait-for-device
+## check disable-verity
+remount=$(adb remount)
+if [[ "$remount" =~ "remount failed" ]]; then
+    echo "Failed to remount, Need to disable-verity"
+    adb disable-verity
+    adb reboot
+    sleep 20
+    adb wait-for-device root
+    adb wait-for-device
+    adb remount
+else
+    echo "Remount success"
+fi
+
+#read log file & collect push files
+while IFS= read line
+do
+    if [[ "$line" =~ "out/target/product/" ]]; then
+        #echo $line
+        path_file=$( echo $line |  awk -F" "  '! /obj/ {print $NF}')
+        if [[ ! -z "$path_file" ]]; then
+            echo "adb push $path_file  /${path_file#*/*/*/*/}"
+            adb push $path_file  /${path_file#*/*/*/*/}
+        fi
+    fi
+done <"$log_file"
