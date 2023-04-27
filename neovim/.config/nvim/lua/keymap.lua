@@ -75,7 +75,7 @@ keymap("t", "<C-l>", "<C-\\><C-N><C-w>l", term_opts)
 keymap("v", "<leader>y", '"+y', opts)
 keymap("v", "<leader>p", '"+p', opts)
 keymap("", "<C-p>", ':FZF<CR>', opts)
-keymap("", "<C-c>", ':OSCYank<CR>', opts)
+keymap("", "<C-c>", ':OSCYankVisual<CR>', opts)
 
 ---- gitsigns
 
@@ -93,7 +93,7 @@ keymap("n", "<leader>q", ":bd<CR>", {noremap = true})
 
 -- telescope
 keymap("n", "<leader>ff", ":Telescope find_files<CR>",   {noremap = true})
-keymap("n", "<C-f>", ":Telescope live_grep default_text=<c-r><c-w><CR>",  {noremap = true})
+keymap("n", "<C-f>", ":Ag <c-r><c-w><CR>",  {noremap = true})
 keymap("n", "<leader>fb", ":Telescope buffers<CR>", {noremap = true})
 keymap("n", "<leader>fB", ":BTags<CR>", {noremap = true})
 
@@ -113,5 +113,8 @@ keymap('n', '<space>e', ':lua vim.diagnostic.open_float()<CR>', opts)
 keymap('n', '[d', ':lua vim.diagnostic.goto_prev()<CR>', opts)
 keymap('n', ']d', ':lua vim.diagnostic.goto_next()<CR>', opts)
 keymap('n', '<space>q', ':lua vim.diagnostic.setloclist()<CR>', opts)
+-- vista toggle
+keymap('n', '<leader>t', ':TagbarToggle<cr>', opts)
+keymap('n', '<leader>l', ':noh<cr>', opts)
 -- comment toggle
-keymap('n', '<leader>/', ':CommentToggle<cr>', opts)
+keymap('', '<leader>/', ':CommentToggle<cr>', opts)

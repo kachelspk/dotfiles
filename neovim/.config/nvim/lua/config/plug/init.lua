@@ -10,4 +10,6 @@ return {
 	require("config.plug.nvim-comment"),
 	require("config.plug.nvim-treesitter"),
 	require("config.plug.indent-blankline"),
+	require("config.plug.workspaces"),
+	require("config.plug.trailing-whitespace"),
 }

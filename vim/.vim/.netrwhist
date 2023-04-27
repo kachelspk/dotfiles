@@ -1,3 +1,3 @@
 let g:netrw_dirhistmax  =10
 let g:netrw_dirhistcnt =1
-let g:netrw_dirhist_1='/home/luonglk/dotfiles/vim/.vim'
+let g:netrw_dirhist_1='/Users/141197/ubuntu/sidekick/pdk/device/fossil/hoki/interfaces/gnss/1.0'

@@ -1,74 +1,184 @@
-local lsp_installer = require("nvim-lsp-installer")
-lsp_installer.on_server_ready(function(server)
-  local opts = {}
-  if server.name == "sumneko_lua" then
-      opts = {
-          settings = {
-              Lua = {
-                  diagnostics = {
-                      globals = { 'vim', 'use' }
-                  },
-              }
-          }
-      }
-  end
-  server:setup(opts)
+local lsp_config_status_ok, nvim_lsp = pcall(require, "lspconfig")
+if not lsp_config_status_ok then
+  return
+end
 
-end)
+local lsp_status_ok,  lsp_status = pcall(require, "lsp-status")
+if not lsp_status_ok then
+  return
+end
 
--- Setup nvim-cmp.
-local cmp = require'cmp'
+local nvim_lsp = require "lspconfig"
+local lsp_status = require("lsp-status")
 
-cmp.setup({
-    window = {
-    },
-    mapping = cmp.mapping.preset.insert({
-        ['<C-b>'] = cmp.mapping.scroll_docs(-4),
-        ['<C-f>'] = cmp.mapping.scroll_docs(4),
-        ['<C-Space>'] = cmp.mapping.complete(),
-        ['<C-e>'] = cmp.mapping.abort(),
-        ['<CR>'] = cmp.mapping.confirm({ select = false }), -- Accept currently selected item. Set `select` to `false` to only confirm explicitly selected items.
-    }),
-    sources = cmp.config.sources({
-        { name = 'nvim_lsp' },
-        { name = 'vsnip' }, -- For vsnip users.
-    }, {
-            { name = 'buffer' },
-        })
-})
+-- function to attach completion when setting up lsp
+local on_attach = function(client)
+    lsp_status.register_progress()
+    lsp_status.config(
+        {
+            status_symbol = "LSP ",
+            indicator_errors = "E",
+            indicator_warnings = "W",
+            indicator_info = "I",
+            indicator_hint = "H",
+            indicator_ok = "ok"
+        }
+    )
 
--- Set configuration for specific filetype.
-cmp.setup.filetype('gitcommit', {
-    sources = cmp.config.sources({
-        { name = 'cmp_git' }, -- You can specify the `cmp_git` source if you were installed it.
-    }, {
-            { name = 'buffer' },
-        })
-})
+    require "completion".on_attach(client)
+    local function buf_set_keymap(...)
+        vim.api.nvim_buf_set_keymap(bufnr, ...)
+    end
+    local function buf_set_option(...)
+        vim.api.nvim_buf_set_option(bufnr, ...)
+    end
 
--- Use buffer source for `/` (if you enabled `native_menu`, this won't work anymore).
-cmp.setup.cmdline('/', {
-    mapping = cmp.mapping.preset.cmdline(),
-    sources = {
-        { name = 'buffer' }
+    buf_set_option("omnifunc", "v:lua.vim.lsp.omnifunc")
+
+    -- Mappings.
+    local opts = {noremap = true, silent = true}
+    buf_set_keymap("n", "gD", "<Cmd>lua vim.lsp.buf.declaration()<CR>", opts)
+    buf_set_keymap("n", "gd", "<Cmd>lua vim.lsp.buf.definition()<CR>", opts)
+    buf_set_keymap("n", "gr", "<cmd>lua vim.lsp.buf.references()<CR>", opts)
+    buf_set_keymap("n", "gi", "<cmd>lua vim.lsp.buf.implementation()<CR>", opts)
+    buf_set_keymap("n", "K", "<Cmd>lua vim.lsp.buf.hover()<CR>", opts)
+    buf_set_keymap("n", "<space>rn", "<cmd>lua vim.lsp.buf.rename()<CR>", opts)
+    buf_set_keymap("n", "<space>e", "<cmd>lua vim.lsp.diagnostic.show_line_diagnostics()<CR>", opts)
+    buf_set_keymap("n", "[d", "<cmd>lua vim.lsp.diagnostic.goto_prev()<CR>", opts)
+    buf_set_keymap("n", "]d", "<cmd>lua vim.lsp.diagnostic.goto_next()<CR>", opts)
+
+    -- Set some keybinds conditional on server capabilities
+    if client.resolved_capabilities.document_formatting then
+        buf_set_keymap("n", "<space>f", "<cmd>lua vim.lsp.buf.formatting()<CR>", opts)
+    elseif client.resolved_capabilities.document_range_formatting then
+        buf_set_keymap("n", "<space>f", "<cmd>lua vim.lsp.buf.range_formatting()<CR>", opts)
+    end
+
+    -- Set autocommands conditional on server_capabilities
+    if client.resolved_capabilities.document_highlight then
+        vim.api.nvim_exec([[
+            augroup lsp_document_highlight
+            autocmd! * <buffer>
+            autocmd CursorHold <buffer> lua vim.lsp.buf.document_highlight()
+            autocmd CursorMoved <buffer> lua vim.lsp.buf.clear_references()
+            " autocmd CursorHold *.* :lua vim.lsp.diagnostic.show_line_diagnostics()
+            autocmd BufWritePre * lua vim.lsp.buf.formatting_sync(nil, 300)
+           augroup END
+        ]],
+            false
+        )
+    else
+        vim.api.nvim_exec([[
+            autocmd!
+            autocmd BufWritePre * Neoformat
+            augroup END
+        ]], false)
+    end
+end
+
+-- Use a loop to conveniently both setup defined servers
+-- and map buffer local keybindings when the language server attaches
+local servers = {
+    "dockerls",
+    "bashls",
+    "cmake",
+    "pyright",
+    "clangd"
+}
+for _, lsp in ipairs(servers) do
+    nvim_lsp[lsp].setup {
+        on_attach = on_attach,
+        capabilities = lsp_status.capabilities
     }
-})
+end
 
--- Use cmdline & path source for ':' (if you enabled `native_menu`, this won't work anymore).
-cmp.setup.cmdline(':', {
-    mapping = cmp.mapping.preset.cmdline(),
-    sources = cmp.config.sources({
-        { name = 'path' }
-    }, {
-            { name = 'cmdline' }
-        })
-})
+-- Setup diagnostics formaters and linters for non LSP provided files
+nvim_lsp.diagnosticls.setup {
+    on_attach = on_attach,
+    capabilities = lsp_status.capabilities,
+    cmd = {"diagnostic-languageserver", "--stdio"},
+    filetypes = {
+        "lua",
+        "sh",
+        "markdown",
+        "json",
+        "yaml",
+        "toml"
+    },
+    init_options = {
+        linters = {
+            shellcheck = {
+                command = "shellcheck",
+                debounce = 100,
+                args = {"--format", "json", "-"},
+                sourceName = "shellcheck",
+                parseJson = {
+                    line = "line",
+                    column = "column",
+                    endLine = "endLine",
+                    endColumn = "endColumn",
+                    message = "${message} [${code}]",
+                    security = "level"
+                },
+                securities = {
+                    error = "error",
+                    warning = "warning",
+                    info = "info",
+                    style = "hint"
+                }
+            },
+            markdownlint = {
+                command = "markdownlint",
+                isStderr = true,
+                debounce = 100,
+                args = {"--stdin"},
+                offsetLine = 0,
+                offsetColumn = 0,
+                sourceName = "markdownlint",
+                formatLines = 1,
+                formatPattern = {
+                    "^.*?:\\s?(\\d+)(:(\\d+)?)?\\s(MD\\d{3}\\/[A-Za-z0-9-/]+)\\s(.*)$",
+                    {
+                        line = 1,
+                        column = 3,
+                        message = {4}
+                    }
+                }
+            }
+        },
+        filetypes = {
+            sh = "shellcheck",
+            markdown = "markdownlint"
+        },
+        formatters = {
+            shfmt = {
+                command = "shfmt",
+                args = {"-i", "2", "-bn", "-ci", "-sr"}
+            },
+            prettier = {
+                command = "prettier",
+                args = {"--stdin-filepath", "%filepath"},
+            }
+        },
+        formatFiletypes = {
+            sh = "shfmt",
+            json = "prettier",
+            yaml = "prettier",
+            toml = "prettier",
+            markdown = "prettier",
+            lua = "prettier"
+        }
+    }
+}
 
--- Setup lspconfig.
-local capabilities = require('cmp_nvim_lsp').update_capabilities(vim.lsp.protocol.make_client_capabilities())
-require('lspconfig')['ccls'].setup {
-    capabilities = capabilities
-}
-require('lspconfig')['sumneko_lua'].setup {
-    capabilities = capabilities
-}
+-- Enable diagnostics
+vim.lsp.handlers["textDocument/publishDiagnostics"] =
+    vim.lsp.with(
+    vim.lsp.diagnostic.on_publish_diagnostics,
+    {
+        underline = true,
+        virtual_text = false,
+        signs = true,
+        update_in_insert = true
+    }
+)

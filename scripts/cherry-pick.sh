@@ -97,5 +97,6 @@ ssh gerrit-asia gerrit query  --current-patch-set --format=JSON topic:$1 is:open
         if [ "$project" == "" ]; then
             continue
         fi
-        download_cl $project
+        echo $project
+        #download_cl $project
     done

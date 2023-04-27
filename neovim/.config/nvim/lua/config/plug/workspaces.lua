@@ -1,0 +1,2 @@
+--require("workspaces").setup()
+
